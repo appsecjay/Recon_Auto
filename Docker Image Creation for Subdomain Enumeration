@@ -1,0 +1,117 @@
+#####################################################################################################
+Summary
+Created a project directory.
+Set up a Dockerfile that installs necessary tools and creates a virtual environment.
+Created a requirements.txt for Python tools.
+Created a script to run the enumeration tools.
+Built and ran the Docker image.
+#####################################################################################################
+Step 1: Prepare Your Project Directory
+Create a new directory for your project:
+bash
+Copy code
+mkdir subdomain-enumeration
+cd subdomain-enumeration
+#####################################################################################################
+Step 2: Create the Dockerfile
+Create a file named Dockerfile in your project directory with the following content:
+-----------------------------------------------------------------------------------------------------------
+FROM ubuntu:20.04
+
+# Install necessary packages
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
+    build-essential \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a virtual environment
+RUN python3 -m venv /venv
+ENV PATH="/venv/bin:$PATH"
+
+# Set the working directory
+WORKDIR /app
+
+# Copy application files
+COPY . .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install massdns
+RUN git clone https://github.com/blechschmidt/massdns.git /massdns && \
+    cd /massdns && \
+    make && \
+    cp bin/massdns /usr/local/bin/  # Updated path to where massdns is built
+
+# Set the entry point
+ENTRYPOINT ["bash", "domain_image.sh"]
+-----------------------------------------------------------------------------------------------
+#####################################################################################################
+Step 3: Create the Requirements File
+Create a file named requirements.txt in the same directory. Ensure it includes only the tools that can be installed via pip. Here's a suggested list:
+
+plaintext
+Copy code
+subfinder
+sublist3r
+amass
+httprobe
+-----------------------------------------------------------------------------------------------
+Step 4: Create Your Main Script
+Create a script called domain_image.sh in the same directory. This script will handle running your tools:
+Startup Script:
+#####################################################################################################
+└─$ cat domain_image.sh 
+#!/bin/bash
+
+# Get the domain from arguments
+DOMAIN=$1
+
+# Create output directory if it doesn't exist
+OUTPUT_DIR="./outputs"
+mkdir -p $OUTPUT_DIR
+
+# Run Subfinder
+echo "Running subdomain finders for $DOMAIN..."
+subfinder -d $DOMAIN -o "$OUTPUT_DIR/subfinder_output.txt" || echo "Subfinder failed"
+
+# Run Amass
+echo "Running Amass for $DOMAIN..."
+amass enum -d $DOMAIN -o "$OUTPUT_DIR/amass_output.txt" || echo "Amass failed"
+
+# Run Sublist3r
+echo "Running Sublist3r for $DOMAIN..."
+sublist3r -d $DOMAIN -o "$OUTPUT_DIR/sublist3r_output.txt" || echo "Sublist3r failed"
+
+# Final output notification
+echo "Process completed. Output files are in the $OUTPUT_DIR directory."
+-----------------------------------------------------------------------------------------------
+Make sure to make the script executable:
+
+bash
+Copy code
+chmod +x domain_image.sh
+-----------------------------------------------------------------------------------------------
+#####################################################################################################
+Step 5: Build the Docker Image
+Now you can build your Docker image. Run the following command in your project directory:
+
+bash
+Copy code
+docker build -t domain_image .
+-----------------------------------------------------------------------------------------------
+#####################################################################################################
+Step 6: Run the Docker Container
+After the image is built successfully, you can run the container with a specified domain:
+
+bash
+Copy code
+docker run -it --rm -v $(pwd):/app domain_image <your_domain>
+Replace <your_domain> with the actual domain you want to test.
+
+
